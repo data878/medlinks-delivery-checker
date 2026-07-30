@@ -60,7 +60,7 @@ export default async function handler(request, response) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: apiToken,
+          Authorization: `Token ${apiToken}`,
         },
       }
     );
@@ -102,7 +102,7 @@ Body: ${body}`
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: apiToken,
+        Authorization: `Token ${apiToken}`,
       },
     });
 
