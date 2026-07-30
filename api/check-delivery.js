@@ -60,7 +60,7 @@ export default async function handler(request, response) {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Token ${apiToken}`,
+          Authorization: apiToken,
         },
       }
     );
@@ -69,9 +69,7 @@ export default async function handler(request, response) {
   const body = await serviceabilityResponse.text();
 
   throw new Error(
-    `Serviceability API failed.
-Status: ${serviceabilityResponse.status}
-Body: ${body}`
+    `Serviceability API failed.\nStatus: ${serviceabilityResponse.status}\nBody: ${body}`
   );
 }
 
@@ -102,7 +100,7 @@ Body: ${body}`
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
-        Authorization: `Token ${apiToken}`,
+        Authorization: apiToken,
       },
     });
 
@@ -138,12 +136,11 @@ Body: ${body}`
       )}`,
     });
   } catch (error) {
-    console.error("Delivery checker error:", error);
+  console.error("Delivery checker error:", error);
 
-    return response.status(502).json({
-      success: false,
-      message:
-        "We could not check delivery availability right now. Please try again.",
-    });
-  }
+  return response.status(502).json({
+    success: false,
+    message: error.message,
+  });
+}
 }
