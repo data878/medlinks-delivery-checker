@@ -66,10 +66,14 @@ export default async function handler(request, response) {
     );
 
     if (!serviceabilityResponse.ok) {
-      throw new Error(
-        `Serviceability API failed with status ${serviceabilityResponse.status}`
-      );
-    }
+  const body = await serviceabilityResponse.text();
+
+  throw new Error(
+    `Serviceability API failed.
+Status: ${serviceabilityResponse.status}
+Body: ${body}`
+  );
+}
 
     const serviceabilityData = await serviceabilityResponse.json();
     const postalCode =
