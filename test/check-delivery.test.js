@@ -44,3 +44,25 @@ test("skips Sundays and configured holidays", () => {
     "2026-10-05"
   );
 });
+
+test("extracts a customer-friendly location from Delhivery postal data", () => {
+  assert.deepEqual(
+    testable.extractLocation({
+      city: "New Delhi",
+      district: "Central Delhi",
+      state_code: "DL",
+    }),
+    { city: "New Delhi", district: "Central Delhi", state: "DL" }
+  );
+
+  assert.deepEqual(
+    testable.extractLocation({ district: "Gurugram", state: "Haryana" }),
+    { city: "Gurugram", district: "Gurugram", state: "Haryana" }
+  );
+
+  assert.deepEqual(testable.extractLocation(null), {
+    city: null,
+    district: null,
+    state: null,
+  });
+});
