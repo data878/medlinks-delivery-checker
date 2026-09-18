@@ -125,6 +125,33 @@ async function checkShadowfax(pincode, apiToken) {
   }
 }
 
+function cleanLocationValue(value) {
+  const cleaned = String(value || "").trim();
+  return cleaned || null;
+}
+
+function extractLocation(postalCode) {
+  if (!postalCode || typeof postalCode !== "object") {
+    return { city: null, district: null, state: null };
+  }
+
+  const district = cleanLocationValue(
+    postalCode.district || postalCode.district_name || postalCode.region
+  );
+  const city =
+    cleanLocationValue(
+      postalCode.city ||
+        postalCode.city_name ||
+        postalCode.pin_city ||
+        postalCode.post_office
+    ) || district;
+  const state = cleanLocationValue(
+    postalCode.state || postalCode.state_name || postalCode.state_code
+  );
+
+  return { city, district, state };
+}
+
 function extractTatDays(data) {
   const candidates = [
     data?.data?.tat,
@@ -161,6 +188,7 @@ async function checkDelhivery(pincode, originPincode, apiToken) {
       headers: { Authorization: authorization },
     });
     const postalCode = serviceData?.delivery_codes?.[0]?.postal_code || null;
+    const location = extractLocation(postalCode);
     const prepaid = String(postalCode?.pre_paid || "").toUpperCase() === "Y";
     const cod =
       String(postalCode?.cod || postalCode?.cash || "").toUpperCase() === "Y";
@@ -172,6 +200,7 @@ async function checkDelhivery(pincode, originPincode, apiToken) {
         available: false,
         codAvailable: false,
         tatDays: null,
+        ...location,
       };
     }
 
@@ -199,6 +228,7 @@ async function checkDelhivery(pincode, originPincode, apiToken) {
       codAvailable: cod,
       tatDays,
       tatError,
+      ...location,
     };
   } catch (error) {
     return {
@@ -373,6 +403,9 @@ export default async function handler(request, response) {
     pincode: destinationPincode,
     originPincode,
     primaryCarrier,
+    city: delhivery.city || null,
+    district: delhivery.district || null,
+    state: delhivery.state || null,
     availableServices: shadowfax.available ? shadowfax.services : ["Express"],
     tatDays: delhivery.tatDays,
     deliveryDateISO: deliveryDate ? isoDate(deliveryDate) : null,
@@ -392,6 +425,7 @@ export default async function handler(request, response) {
 export const testable = {
   calculateDeliveryDate,
   extractTatDays,
+  extractLocation,
   normalizeToken,
   tokenHeader,
 };
