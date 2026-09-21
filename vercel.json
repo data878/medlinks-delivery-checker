@@ -1,0 +1,4 @@
+{
+  "crons": [{ "path": "/api/update-policy-date", "schedule": "30 18 * * *" }],
+  "functions": { "api/update-policy-date.js": { "maxDuration": 60 } }
+}
