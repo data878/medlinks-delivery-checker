@@ -4,6 +4,8 @@ const DELHIVERY_TAT_URL =
   "https://track.delhivery.com/api/dc/expected_tat";
 const SHADOWFAX_PRODUCTION_URL = "https://dale.shadowfax.in/api";
 const DEFAULT_ORIGIN_PINCODE = "110029";
+const DEFAULT_CUTOFF_HOUR_IST = 14;
+const DEFAULT_SHADOWFAX_REQUIRED_TIER = "Regular";
 const CACHE_TTL_MS = 10 * 60 * 1000;
 const REQUEST_TIMEOUT_MS = 8000;
 
@@ -16,6 +18,16 @@ function normalizeToken(token) {
 function tokenHeader(token) {
   const normalized = normalizeToken(token);
   return normalized ? `Token ${normalized}` : "";
+}
+
+function hasRequiredShadowfaxTier(services, requiredTier) {
+  return (
+    Array.isArray(services) &&
+    services.some(
+      (service) =>
+        String(service).toLowerCase() === String(requiredTier).toLowerCase()
+    )
+  );
 }
 
 function allowedOrigins() {
@@ -109,11 +121,16 @@ async function checkShadowfax(pincode, apiToken) {
     const record = records.find(
       (item) => String(item?.code || "") === String(pincode)
     );
+    const services = Array.isArray(record?.services) ? record.services : [];
+    const requiredTier = String(
+      process.env.SHADOWFAX_REQUIRED_TIER || DEFAULT_SHADOWFAX_REQUIRED_TIER
+    ).trim();
 
     return {
       attempted: true,
-      available: Boolean(record),
-      services: Array.isArray(record?.services) ? record.services : [],
+      available: hasRequiredShadowfaxTier(services, requiredTier),
+      services,
+      requiredTier,
     };
   } catch (error) {
     return {
@@ -271,6 +288,15 @@ function holidayDates() {
   );
 }
 
+function shadowfaxNextDayPincodes() {
+  return new Set(
+    String(process.env.SHADOWFAX_NEXT_DAY_PINCODES || "")
+      .split(",")
+      .map((pincode) => pincode.trim())
+      .filter((pincode) => /^[1-9][0-9]{5}$/.test(pincode))
+  );
+}
+
 function isoDate(date) {
   return date.toISOString().slice(0, 10);
 }
@@ -282,7 +308,9 @@ function isOperatingDay(date, holidays) {
 function calculateDeliveryDate(tatDays, now = new Date()) {
   const ist = getIstParts(now);
   const date = new Date(Date.UTC(ist.year, ist.month - 1, ist.day));
-  const cutoffHour = Number(process.env.CUTOFF_HOUR_IST || 12);
+  const cutoffHour = Number(
+    process.env.CUTOFF_HOUR_IST || DEFAULT_CUTOFF_HOUR_IST
+  );
   const afterCutoff = ist.hour >= cutoffHour;
   let remaining = Math.max(0, Math.ceil(Number(tatDays))) + (afterCutoff ? 1 : 0);
   const holidays = holidayDates();
@@ -391,11 +419,17 @@ export default async function handler(request, response) {
     return response.status(200).json(payload);
   }
 
-  const deliveryDate =
-    delhivery.tatDays !== null
-      ? calculateDeliveryDate(delhivery.tatDays)
-      : null;
+  const nextDayEligible =
+    shadowfax.available &&
+    shadowfaxNextDayPincodes().has(destinationPincode);
   const primaryCarrier = shadowfax.available ? "Shadowfax" : "Delhivery";
+  const selectedTatDays = nextDayEligible
+    ? 1
+    : primaryCarrier === "Delhivery"
+      ? delhivery.tatDays
+      : null;
+  const deliveryDate =
+    selectedTatDays !== null ? calculateDeliveryDate(selectedTatDays) : null;
   const payload = {
     success: true,
     serviceable: true,
@@ -403,16 +437,17 @@ export default async function handler(request, response) {
     pincode: destinationPincode,
     originPincode,
     primaryCarrier,
+    nextDayEligible,
     city: delhivery.city || null,
     district: delhivery.district || null,
     state: delhivery.state || null,
     availableServices: shadowfax.available ? shadowfax.services : ["Express"],
-    tatDays: delhivery.tatDays,
+    tatDays: selectedTatDays,
     deliveryDateISO: deliveryDate ? isoDate(deliveryDate) : null,
     deliveryDateFormatted: deliveryDate
       ? formatDeliveryDate(deliveryDate)
       : null,
-    useLocalEstimate: !deliveryDate,
+    useLocalEstimate: false,
     message: deliveryDate
       ? `Delivery Available • Delivery by ${formatDeliveryDate(deliveryDate)}`
       : "Delivery Available",
@@ -428,4 +463,6 @@ export const testable = {
   extractLocation,
   normalizeToken,
   tokenHeader,
+  hasRequiredShadowfaxTier,
+  shadowfaxNextDayPincodes,
 };
