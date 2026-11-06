@@ -15,11 +15,27 @@ test("extracts TAT from supported response shapes", () => {
   assert.equal(testable.extractTatDays({ data: {} }), null);
 });
 
-test("adds an operating day after the noon IST cutoff", () => {
-  process.env.CUTOFF_HOUR_IST = "12";
+test("accepts only the configured Shadowfax service tier", () => {
+  assert.equal(
+    testable.hasRequiredShadowfaxTier(["Large", "Regular", "Surface"], "Regular"),
+    true
+  );
+  assert.equal(testable.hasRequiredShadowfaxTier(["Large"], "Regular"), false);
+});
+
+test("loads only valid verified Next Day PIN codes", () => {
+  process.env.SHADOWFAX_NEXT_DAY_PINCODES = "110083, 122001,invalid,012345";
+  assert.deepEqual(
+    [...testable.shadowfaxNextDayPincodes()],
+    ["110083", "122001"]
+  );
+});
+
+test("adds an operating day after the 2 PM IST cutoff", () => {
+  process.env.CUTOFF_HOUR_IST = "14";
   process.env.HOLIDAY_DATES = "";
-  const beforeCutoff = new Date("2026-09-16T05:30:00.000Z"); // 11:00 IST
-  const afterCutoff = new Date("2026-09-16T07:30:00.000Z"); // 13:00 IST
+  const beforeCutoff = new Date("2026-09-16T07:30:00.000Z"); // 13:00 IST
+  const afterCutoff = new Date("2026-09-16T09:30:00.000Z"); // 15:00 IST
 
   assert.equal(
     testable.calculateDeliveryDate(2, beforeCutoff).toISOString().slice(0, 10),
@@ -32,7 +48,7 @@ test("adds an operating day after the noon IST cutoff", () => {
 });
 
 test("skips Sundays and configured holidays", () => {
-  process.env.CUTOFF_HOUR_IST = "12";
+  process.env.CUTOFF_HOUR_IST = "14";
   process.env.HOLIDAY_DATES = "2026-10-02";
   const thursdayMorning = new Date("2026-10-01T04:00:00.000Z");
 
